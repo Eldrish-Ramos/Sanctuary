@@ -1,0 +1,49 @@
+// This file defines the data models for users and shrines using an ORM.
+
+const { Sequelize, DataTypes } = require('sequelize');
+const sequelize = new Sequelize(process.env.DATABASE_URL);
+
+// User model
+const User = sequelize.define('User', {
+    nickname: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    avatar: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    bio: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+    },
+}, {
+    timestamps: true,
+});
+
+// Shrine model
+const Shrine = sequelize.define('Shrine', {
+    title: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    content: {
+        type: DataTypes.JSONB,
+        allowNull: false,
+    },
+    userId: {
+        type: DataTypes.INTEGER,
+        references: {
+            model: User,
+            key: 'id',
+        },
+    },
+}, {
+    timestamps: true,
+});
+
+// Associations
+User.hasMany(Shrine, { foreignKey: 'userId' });
+Shrine.belongsTo(User, { foreignKey: 'userId' });
+
+module.exports = { User, Shrine };
