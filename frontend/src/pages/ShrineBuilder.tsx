@@ -2,6 +2,16 @@ import React, { useState, FC, useRef } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './ShrineBuilder.scss';
+import axios from 'axios';
+
+function generateCode(length = 15) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  for (let i = 0; i < length; ++i) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
 type BlockType = 'text' | 'image' | 'audio';
 
@@ -14,6 +24,7 @@ interface Block {
   fontFamily?: string;
   fontSize?: string;
   color?: string;
+  finalized?: boolean;
 }
 
 const BLOCK_OPTIONS: { type: BlockType; label: string }[] = [
@@ -62,7 +73,8 @@ const TextBlock: FC<{
   block: Block;
   onChange: (id: string, content: string) => void;
   onStyleChange: (id: string, style: Partial<Block>) => void;
-}> = ({ block, onChange, onStyleChange }) => {
+  onFinalize: (id: string) => void;
+}> = ({ block, onChange, onStyleChange, onFinalize }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   // Toolbar actions
@@ -73,8 +85,22 @@ const TextBlock: FC<{
     }
   };
 
+  if (block.finalized) {
+    return (
+      <div
+        style={{
+          fontFamily: block.fontFamily || 'serif',
+          fontSize: block.fontSize || '1.1rem',
+          color: block.color || '#7c2152',
+          minHeight: 60,
+        }}
+        dangerouslySetInnerHTML={{ __html: block.content }}
+      />
+    );
+  }
+
   return (
-    <div>
+    <div className="shrine-builder__block">
       <div className="shrine-builder__toolbar">
         <select
           value={block.fontFamily || 'serif'}
@@ -103,6 +129,14 @@ const TextBlock: FC<{
         <button type="button" onClick={() => exec('bold')} title="Bold"><b>B</b></button>
         <button type="button" onClick={() => exec('italic')} title="Italic"><i>I</i></button>
         <button type="button" onClick={() => exec('underline')} title="Underline"><u>U</u></button>
+        <button
+          type="button"
+          className="shrine-builder__finalize-btn"
+          onClick={() => onFinalize(block.id)}
+          title="Finalize"
+        >
+          Finalize
+        </button>
       </div>
       <div
         ref={ref}
@@ -122,12 +156,104 @@ const TextBlock: FC<{
   );
 };
 
+const ImageBlock: FC<{
+  block: Block;
+  onChange: (id: string, content: string) => void;
+  onFinalize: (id: string) => void;
+}> = ({ block, onChange, onFinalize }) => {
+  if (block.finalized) {
+    return (
+      <div>
+        {block.content && (
+          <img
+            src={block.content}
+            alt=""
+            style={{
+              maxWidth: '100%',
+              borderRadius: '1rem',
+              display: 'block',
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="shrine-builder__block">
+      <input
+        className="shrine-builder__input"
+        placeholder="Paste image URL..."
+        value={block.content}
+        onChange={e => onChange(block.id, e.target.value)}
+      />
+      <button
+        type="button"
+        className="shrine-builder__finalize-btn"
+        onClick={() => onFinalize(block.id)}
+        title="Finalize"
+      >
+        Finalize
+      </button>
+      {block.content && (
+        <img
+          src={block.content}
+          alt=""
+          style={{
+            maxWidth: '100%',
+            borderRadius: '1rem',
+            marginTop: '0.5rem',
+            display: 'block',
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const AudioBlock: FC<{
+  block: Block;
+  onChange: (id: string, content: string) => void;
+  onFinalize: (id: string) => void;
+}> = ({ block, onChange, onFinalize }) => {
+  if (block.finalized) {
+    return (
+      <div>
+        {block.content && (
+          <audio controls src={block.content} style={{ width: '100%' }} />
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="shrine-builder__block">
+      <input
+        className="shrine-builder__input"
+        placeholder="Paste audio URL..."
+        value={block.content}
+        onChange={e => onChange(block.id, e.target.value)}
+      />
+      <button
+        type="button"
+        className="shrine-builder__finalize-btn"
+        onClick={() => onFinalize(block.id)}
+        title="Finalize"
+      >
+        Finalize
+      </button>
+      {block.content && (
+        <audio controls src={block.content} style={{ width: '100%', marginTop: '0.5rem' }} />
+      )}
+    </div>
+  );
+};
+
 const DropArea: FC<{
   blocks: Block[];
   onDropBlock: (type: BlockType, x: number, y: number) => void;
   updateBlockContent: (id: string, content: string) => void;
   updateBlockStyle: (id: string, style: Partial<Block>) => void;
-}> = ({ blocks, onDropBlock, updateBlockContent, updateBlockStyle }) => {
+  finalizeBlock: (id: string) => void;
+}> = ({ blocks, onDropBlock, updateBlockContent, updateBlockStyle, finalizeBlock }) => {
   const dropAreaRef = useRef<HTMLDivElement>(null);
 
   const [, drop] = useDrop(
@@ -152,13 +278,17 @@ const DropArea: FC<{
       {blocks.map(block => (
         <div
           key={block.id}
-          className="shrine-builder__block"
+          className={block.finalized ? '' : 'shrine-builder__block'}
           style={{
             position: 'absolute',
             left: block.x,
             top: block.y,
             minWidth: 180,
             minHeight: 40,
+            background: block.finalized ? 'none' : undefined,
+            boxShadow: block.finalized ? 'none' : undefined,
+            border: block.finalized ? 'none' : undefined,
+            padding: block.finalized ? 0 : undefined,
           }}
         >
           {block.type === 'text' && (
@@ -166,22 +296,21 @@ const DropArea: FC<{
               block={block}
               onChange={updateBlockContent}
               onStyleChange={updateBlockStyle}
+              onFinalize={finalizeBlock}
             />
           )}
           {block.type === 'image' && (
-            <input
-              className="shrine-builder__input"
-              placeholder="Paste image URL..."
-              value={block.content}
-              onChange={e => updateBlockContent(block.id, e.target.value)}
+            <ImageBlock
+              block={block}
+              onChange={updateBlockContent}
+              onFinalize={finalizeBlock}
             />
           )}
           {block.type === 'audio' && (
-            <input
-              className="shrine-builder__input"
-              placeholder="Paste audio URL..."
-              value={block.content}
-              onChange={e => updateBlockContent(block.id, e.target.value)}
+            <AudioBlock
+              block={block}
+              onChange={updateBlockContent}
+              onFinalize={finalizeBlock}
             />
           )}
         </div>
@@ -197,6 +326,7 @@ const DropArea: FC<{
 
 const ShrineBuilder = () => {
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const onDropBlock = (type: BlockType, x: number, y: number) => {
     setBlocks(prev => [
@@ -219,8 +349,26 @@ const ShrineBuilder = () => {
     setBlocks(blocks => blocks.map(b => (b.id === id ? { ...b, ...style } : b)));
   };
 
+  const finalizeBlock = (id: string) => {
+    setBlocks(blocks => blocks.map(b => (b.id === id ? { ...b, finalized: true } : b)));
+  };
+
+  const handleShare = async () => {
+    const code = generateCode();
+    try {
+      await axios.post('/api/shrines', {
+        code,
+        content: blocks,
+      });
+      setShareStatus(`Your shrine has been shared! Code: ${code}`);
+    } catch (err) {
+      setShareStatus('Failed to share shrine. Please try again.');
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
+      <div contentEditable style={{ minHeight: 60 }} />
       <div className="shrine-builder">
         <h2 className="shrine-builder__title">Shrine Builder</h2>
         <DropArea
@@ -228,12 +376,21 @@ const ShrineBuilder = () => {
           onDropBlock={onDropBlock}
           updateBlockContent={updateBlockContent}
           updateBlockStyle={updateBlockStyle}
+          finalizeBlock={finalizeBlock}
         />
         <div className="shrine-builder__palette">
           {BLOCK_OPTIONS.map(opt => (
             <PaletteBlock key={opt.type} type={opt.type} label={opt.label} />
           ))}
         </div>
+        <button
+          className="shrine-builder__share-btn"
+          onClick={handleShare}
+          disabled={blocks.length === 0}
+        >
+          Share
+        </button>
+        {shareStatus && <div className="shrine-builder__share-status">{shareStatus}</div>}
       </div>
     </DndProvider>
   );

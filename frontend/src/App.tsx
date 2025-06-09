@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import ShrineBuilder from './pages/ShrineBuilder';
-// import ExplorePage from './pages/ExplorePage';
+import ExplorePage from './pages/ExplorePage';
 // import NotFound from './pages/NotFound';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -16,6 +16,7 @@ const App = () => {
           <Switch>
             <Route exact path="/" component={HomePage} />
             <Route path="/shrine-builder" component={ShrineBuilder} />
+            <Route path="/explore" component={ExplorePage} />
           </Switch>
         </main>
         <Footer />
