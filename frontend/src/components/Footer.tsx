@@ -3,8 +3,11 @@ import './Footer.scss';
 
 const Footer = () => (
   <footer className="footer">
-    <span>
-      © {new Date().getFullYear()} Digital Shrine &mdash; Made with <span className="footer__heart">♥</span>
+    <div className="footer__shrine-base">
+      <span className="footer__heart-glow">♥</span>
+    </div>
+    <span className="footer__text">
+      © {new Date().getFullYear()} Digital Shrine &mdash; Crafted with love and memory
     </span>
   </footer>
 );
