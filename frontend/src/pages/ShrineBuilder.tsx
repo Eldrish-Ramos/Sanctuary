@@ -77,14 +77,19 @@ const TextBlock: FC<{
 }> = ({ block, onChange, onStyleChange, onFinalize }) => {
   const ref = useRef<HTMLDivElement>(null);
 
-  // Toolbar actions
-  const exec = (command: string, value?: string) => {
-    document.execCommand(command, false, value);
-    if (ref.current) {
-      onChange(block.id, ref.current.innerHTML);
-    }
+  // Handle input and update content
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    onChange(block.id, (e.target as HTMLDivElement).innerHTML);
   };
 
+  // Handle paste to strip direction and unwanted styles
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  };
+
+  // Finalized (read-only) view
   if (block.finalized) {
     return (
       <div
@@ -93,12 +98,15 @@ const TextBlock: FC<{
           fontSize: block.fontSize || '1.1rem',
           color: block.color || '#7c2152',
           minHeight: 60,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
         }}
         dangerouslySetInnerHTML={{ __html: block.content }}
       />
     );
   }
 
+  // Editable view
   return (
     <div className="shrine-builder__block">
       <div className="shrine-builder__toolbar">
@@ -126,9 +134,9 @@ const TextBlock: FC<{
             <option key={c} value={c} style={{ color: c }}>{c}</option>
           ))}
         </select>
-        <button type="button" onClick={() => exec('bold')} title="Bold"><b>B</b></button>
-        <button type="button" onClick={() => exec('italic')} title="Italic"><i>I</i></button>
-        <button type="button" onClick={() => exec('underline')} title="Underline"><u>U</u></button>
+        <button type="button" onClick={() => document.execCommand('bold')} title="Bold"><b>B</b></button>
+        <button type="button" onClick={() => document.execCommand('italic')} title="Italic"><i>I</i></button>
+        <button type="button" onClick={() => document.execCommand('underline')} title="Underline"><u>U</u></button>
         <button
           type="button"
           className="shrine-builder__finalize-btn"
@@ -148,8 +156,14 @@ const TextBlock: FC<{
           fontSize: block.fontSize || '1.1rem',
           color: block.color || '#7c2152',
           minHeight: 60,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          outline: 'none',
         }}
-        onInput={e => onChange(block.id, (e.target as HTMLDivElement).innerHTML)}
+        onInput={handleInput}
+        onPaste={handlePaste}
+        spellCheck={true}
+        tabIndex={0}
         dangerouslySetInnerHTML={{ __html: block.content }}
       />
     </div>
